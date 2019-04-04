@@ -86,7 +86,10 @@ public class Micropolis
 	public int [][] fireRate;       //firestations reach- used for overlay graphs
 	int [][] policeMap;      //police stations- cleared and rebuilt each sim cycle
 	public int [][] policeMapEffect;//police stations reach- used for overlay graphs
+	int [][] recycleCentMap;      //police stations- cleared and rebuilt each sim cycle
+	public int [][] recycleMapEffect;//police stations reach- used for overlay graphs
 
+	
 	/** For each 8x8 section of city, this is an integer between 0 and 64,
 	 * with higher numbers being closer to the center of the city. */
 	int [][] comRate;
@@ -120,6 +123,7 @@ public class Micropolis
 	int churchCount;
 	int policeCount;
 	int fireStationCount;
+	int recyclingCenterCount;
 	int stadiumCount;
 	int coalCount;
 	int nuclearCount;
@@ -135,7 +139,8 @@ public class Micropolis
 	int lastTotalPop;
 	int lastFireStationCount;
 	int lastPoliceCount;
-
+	int lastRecycleCount;
+	
 	int trafficMaxLocationX;
 	int trafficMaxLocationY;
 	int pollutionMaxLocationX;
@@ -172,11 +177,13 @@ public class Micropolis
 	public double roadPercent = 1.0;
 	public double policePercent = 1.0;
 	public double firePercent = 1.0;
-
+	public double recyclePercent = 1.0;
+	
 	int taxEffect = 7;
 	int roadEffect = 32;
 	int policeEffect = 1000;
 	int fireEffect = 1000;
+	int recycleEffect=1000;
 
 	int cashFlow; //net change in totalFunds in previous year
 
@@ -244,6 +251,8 @@ public class Micropolis
 		fireStMap = new int[smY][smX];
 		policeMap = new int[smY][smX];
 		policeMapEffect = new int[smY][smX];
+		recycleCentMap = new int[smY][smX];
+		recycleMapEffect = new int[smY][smX];
 		fireRate = new int[smY][smX];
 		comRate = new int[smY][smX];
 
@@ -533,6 +542,7 @@ public class Micropolis
 		churchCount = 0;
 		policeCount = 0;
 		fireStationCount = 0;
+		recyclingCenterCount=0;
 		stadiumCount = 0;
 		coalCount = 0;
 		nuclearCount = 0;
@@ -544,6 +554,7 @@ public class Micropolis
 			for (int x = 0; x < fireStMap[y].length; x++) {
 				fireStMap[y][x] = 0;
 				policeMap[y][x] = 0;
+				recycleCentMap [y][x]= 0;
 			}
 		}
 	}
@@ -1146,6 +1157,9 @@ public class Micropolis
 		final int HWLDX = (getWidth()+1)/2;
 		final int HWLDY = (getHeight()+1)/2;
 		int [][] tem = new int[HWLDY][HWLDX];
+		
+		
+		
 		for (int x = 0; x < HWLDX; x++)
 		{
 			for (int y = 0; y < HWLDY; y++)
@@ -1214,16 +1228,27 @@ public class Micropolis
 
 		tem = doSmooth(tem);
 		tem = doSmooth(tem);
-
+		
 		int pcount = 0;
 		int ptotal = 0;
 		int pmax = 0;
+		
+		recycleCentMap = smoothFirePoliceMap(recycleCentMap);
+		recycleCentMap = smoothFirePoliceMap(recycleCentMap);
+		recycleCentMap = smoothFirePoliceMap(recycleCentMap);
+
+		for (int sy = 0; sy < recycleCentMap.length; sy++) {
+			for (int sx = 0; sx < recycleCentMap[sy].length; sx++) {
+				recycleMapEffect[sy][sx] = recycleCentMap[sy][sx];
+			}
+		}
+		
 		for (int x = 0; x < HWLDX; x++)
 		{
 			for (int y = 0; y < HWLDY; y++)
 			{
 				int z = tem[y][x];
-				pollutionMem[y][x] = z;
+				pollutionMem[y][x] = z-recycleCentMap[y/4][x/4];
 
 				if (z != 0)
 				{
@@ -1731,6 +1756,7 @@ public class Micropolis
 		lastTotalPop = totalPop;
 		lastFireStationCount = fireStationCount;
 		lastPoliceCount = policeCount;
+		lastRecycleCount = recyclingCenterCount;
 
 		BudgetNumbers b = generateBudget();
 
@@ -1738,6 +1764,7 @@ public class Micropolis
 		budget.roadFundEscrow -= b.roadFunded;
 		budget.fireFundEscrow -= b.fireFunded;
 		budget.policeFundEscrow -= b.policeFunded;
+		budget.recycleFundEscrow -= b.recycleFunded;
 
 		taxEffect = b.taxRate;
 		roadEffect = b.roadRequest != 0 ?
@@ -1748,6 +1775,9 @@ public class Micropolis
 			1000;
 		fireEffect = b.fireRequest != 0 ?
 			(int)Math.floor(1000.0 * (double)b.fireFunded / (double)b.fireRequest) :
+			1000;
+		recycleEffect = b.recycleRequest != 0 ?
+			(int)Math.floor(1000.0 * (double)b.recycleFunded / (double)b.recycleRequest) :
 			1000;
 	}
 
@@ -1763,7 +1793,7 @@ public class Micropolis
 	void collectTax()
 	{
 		int revenue = budget.taxFund / TAXFREQ;
-		int expenses = -(budget.roadFundEscrow + budget.fireFundEscrow + budget.policeFundEscrow) / TAXFREQ;
+		int expenses = -(budget.roadFundEscrow + budget.fireFundEscrow + budget.policeFundEscrow+budget.recycleFundEscrow) / TAXFREQ;
 
 		FinancialHistory hist = new FinancialHistory();
 		hist.cityTime = cityTime;
@@ -1780,6 +1810,7 @@ public class Micropolis
 		budget.roadFundEscrow = 0;
 		budget.fireFundEscrow = 0;
 		budget.policeFundEscrow = 0;
+		budget.recycleFundEscrow =0;
 	}
 
 	/** Annual maintenance cost of each police station. */
@@ -1787,7 +1818,10 @@ public class Micropolis
 
 	/** Annual maintenance cost of each fire station. */
 	static final int FIRE_STATION_MAINTENANCE = 100;
-
+	
+	/** Annual maintenance cost of each recycling center. */
+	static final int RECYCLE_CENTER_MAINTENANCE = 100;
+	
 	/**
 	 * Calculate the current budget numbers.
 	 */
@@ -1798,7 +1832,8 @@ public class Micropolis
 		b.roadPercent = Math.max(0.0, roadPercent);
 		b.firePercent = Math.max(0.0, firePercent);
 		b.policePercent = Math.max(0.0, policePercent);
-
+		b.recyclePercent = Math.max(0.0, recyclePercent);
+		
 		b.previousBalance = budget.totalFunds;
 		b.taxIncome = (int)Math.round(lastTotalPop * landValueAverage / 120 * b.taxRate * FLevels[gameLevel]);
 		assert b.taxIncome >= 0;
@@ -1806,11 +1841,13 @@ public class Micropolis
 		b.roadRequest = (int)Math.round((lastRoadTotal + lastRailTotal * 2) * RLevels[gameLevel]);
 		b.fireRequest = FIRE_STATION_MAINTENANCE * lastFireStationCount;
 		b.policeRequest = POLICE_STATION_MAINTENANCE * lastPoliceCount;
+		b.recycleRequest = RECYCLE_CENTER_MAINTENANCE * lastRecycleCount;
 
 		b.roadFunded = (int)Math.round(b.roadRequest * b.roadPercent);
 		b.fireFunded = (int)Math.round(b.fireRequest * b.firePercent);
 		b.policeFunded = (int)Math.round(b.policeRequest * b.policePercent);
-
+		b.recycleFunded = (int)Math.round(b.recycleRequest * b.recyclePercent);
+		
 		int yumDuckets = budget.totalFunds + b.taxIncome;
 		assert yumDuckets >= 0;
 
@@ -1823,6 +1860,18 @@ public class Micropolis
 				if (yumDuckets >= b.policeFunded)
 				{
 					yumDuckets -= b.policeFunded;
+					if (yumDuckets >= b.recycleFunded)
+					{
+						yumDuckets -= b.recycleFunded;
+					}
+					else
+					{
+						assert b.recycleRequest != 0;
+
+						b.recycleFunded = yumDuckets;
+						b.recyclePercent = (double)b.recycleFunded / (double)b.recycleRequest;
+						yumDuckets = 0;
+					}
 				}
 				else
 				{
@@ -1830,6 +1879,8 @@ public class Micropolis
 
 					b.policeFunded = yumDuckets;
 					b.policePercent = (double)b.policeFunded / (double)b.policeRequest;
+					b.recycleFunded = 0;
+					b.recyclePercent = 0.0;
 					yumDuckets = 0;
 				}
 			}
@@ -1841,6 +1892,8 @@ public class Micropolis
 				b.firePercent = (double)b.fireFunded / (double)b.fireRequest;
 				b.policeFunded = 0;
 				b.policePercent = 0.0;
+				b.recycleFunded = 0;
+				b.recyclePercent = 0.0;
 				yumDuckets = 0;
 			}
 		}
@@ -1854,9 +1907,11 @@ public class Micropolis
 			b.firePercent = 0.0;
 			b.policeFunded = 0;
 			b.policePercent = 0.0;
+			b.recycleFunded = 0;
+			b.recyclePercent = 0.0;
 		}
 
-		b.operatingExpenses = b.roadFunded + b.fireFunded + b.policeFunded;
+		b.operatingExpenses = b.roadFunded + b.fireFunded + b.policeFunded+b.recycleFunded;
 		b.newBalance = b.previousBalance + b.taxIncome - b.operatingExpenses;
 
 		return b;
