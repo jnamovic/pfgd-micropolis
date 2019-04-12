@@ -1158,7 +1158,15 @@ public class Micropolis
 		final int HWLDY = (getHeight()+1)/2;
 		int [][] tem = new int[HWLDY][HWLDX];
 		
-		
+		recycleCentMap = smoothFirePoliceMap(recycleCentMap);
+		recycleCentMap = smoothFirePoliceMap(recycleCentMap);
+		recycleCentMap = smoothFirePoliceMap(recycleCentMap);
+
+		for (int sy = 0; sy < recycleCentMap.length; sy++) {
+			for (int sx = 0; sx < recycleCentMap[sy].length; sx++) {
+				recycleMapEffect[sy][sx] = recycleCentMap[sy][sx];
+			}
+		}
 		
 		for (int x = 0; x < HWLDX; x++)
 		{
@@ -1182,7 +1190,15 @@ public class Micropolis
 								qtem[y/2][x/2] += 15;
 								continue;
 							}
-							plevel += getPollutionValue(tile);
+							
+							if (tile >= NEW_BUILDING) //recycling center
+							{
+								//lower terrainMem
+								qtem[y/2][x/2] -= 35;
+								continue;
+							}
+							
+							plevel += getPollutionValue(tile)-recycleCentMap[y/4][x/4];;
 							if (isConstructed(tile))
 								lvflag++;
 						}
@@ -1190,7 +1206,7 @@ public class Micropolis
 				}
 
 				if (plevel < 0)
-					plevel = 250; //?
+					plevel = 0; //?
 
 				if (plevel > 255)
 					plevel = 255;
@@ -1233,22 +1249,14 @@ public class Micropolis
 		int ptotal = 0;
 		int pmax = 0;
 		
-		recycleCentMap = smoothFirePoliceMap(recycleCentMap);
-		recycleCentMap = smoothFirePoliceMap(recycleCentMap);
-		recycleCentMap = smoothFirePoliceMap(recycleCentMap);
-
-		for (int sy = 0; sy < recycleCentMap.length; sy++) {
-			for (int sx = 0; sx < recycleCentMap[sy].length; sx++) {
-				recycleMapEffect[sy][sx] = recycleCentMap[sy][sx];
-			}
-		}
+		
 		
 		for (int x = 0; x < HWLDX; x++)
 		{
 			for (int y = 0; y < HWLDY; y++)
 			{
 				int z = tem[y][x];
-				pollutionMem[y][x] = z-recycleCentMap[y/4][x/4];
+				pollutionMem[y][x] = z;
 
 				if (z != 0)
 				{
